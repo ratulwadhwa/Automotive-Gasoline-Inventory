@@ -1,0 +1,211 @@
+---
+title: "EY Casestudy"
+author: "Ratul Wadhwa"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '5'
+  rmarkdown::pdf_document:
+    fig_caption: yes
+    includes:
+      in_header: my_header.tex
+    toc: yes
+    toc_depth: 5
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+# Objective 
+
+The objective of this case study is to produce forecasts of the total automotive gasoline inventory
+on a month-to-month basis, using a combination of econometrics and arithmetic functions in R.
+
+```{r}
+# install packages
+library(dplyr)
+library(fpp3)
+library(tidyverse)
+library(forecast)
+library(tseries)
+```
+
+```{r}
+# Load data and create time series object 
+mydatanew = read.csv("data.csv", header=TRUE)  # read csv file
+```
+
+```{r}
+#Set trim variable 
+trim <- length(mydatanew [,5])
+```
+
+
+```{r}
+# Defining the length of the dataset as trim to define the variables seperately.
+#Define variables
+Dates <- mydatanew [1:trim, 1]
+sale <- mydatanew [1:trim, 2]
+imports <- mydatanew [1:trim, 3]
+production <- mydatanew [1:trim, 4]
+export <-mydatanew [1:trim, 5]
+
+inventory <- production+imports-sale-export
+newdata = cbind(mydatanew,inventory)
+
+trim1 <- length(newdata [,6])
+inventoryn <-newdata[1:trim, 6]
+
+```
+
+ The total automotive gasoline inventory can be calculated by inflow-outflow. Production and imports are considered as the inputs here and sales and exports are the outputs. **production+imports-sale-expor** gives us the total inventory of the automotive gasoline. The negative values here indicates shortage, outflow more than inflow.
+
+# Time Series Plot 
+
+```{r}
+#Create Time Series Data
+invts <- ts(inventoryn, start=c(2010, 7), end=c(2021, 9), frequency=12)
+plot(invts)
+
+```
+
+# Unit root tests
+
+```{r}
+test <- Box.test(invts, lag = 1, type = c("Ljung-Box"), fitdf = 0)
+test
+
+ndiffs(invts)
+nsdiffs(invts)
+```
+
+The test statistic is tiny, and well within the range we would expect for stationary data. So we can conclude that the data is stationary.
+To double check that I used nsdiffs() and ndiffs() functions and as they returns 0, it suggest we do not need seasonal difference and a first difference.
+
+# Choosing an appropriate ARIMA MODEL
+
+```{r}
+invts %>% ggtsdisplay(main="")
+```
+
+```{r include=FALSE}
+# ACF Test
+acf(invts)
+pacf(invts)
+```
+
+Reading the ACF and the PACF plots above helps to identify the appropriate ARIMA models. The ACF plots helps to identify the non stationary part of the ARIMA model. 
+
+```{r}
+#Fit Arima Model
+
+(fit <- arima((invts), c(1, 0, 1)))
+checkresiduals(fit)
+
+```
+
+he p-value of the test is 0.772, which is much larger than 0.05. it fits the data reasonably well.
+The ARIMA model does well in capturing all the dynamics in the data as the residuals seem to be white noise.
+
+## Fitting auto.arima
+
+```{r}
+fitARIMA <- auto.arima(invts, trace=TRUE)
+```
+
+The models with the lowest AICc is considered as the best model. For our case it is  Best model: *ARIMA(0,0,1)(1,0,1)[12] with zero mean * 
+
+```{r}
+fitARIMA <- Arima(invts, order=c(0,0,1), seasonal=c(1,0,1))
+checkresiduals(fitARIMA)
+
+```
+
+
+```{r}
+# Forecast
+plot(as.ts(invts))
+lines(fitted(fitARIMA), col="red")
+```
+
+## Forecasting next 12 months
+
+```{r}
+#Forecast for next 12 months
+futurVal <- forecast(fitARIMA, h=12, level=c(95)) #confidence level 95%
+
+plot(forecast(futurVal))
+```
+
+### Values 
+
+Values of the total automotive gasoline inventory forecasted for the next 10 months. 
+
+```{r}
+# 12 predicted values
+futurVal$mean
+```
+
+
+---
+
+# Differencing the Data
+
+Although the tests suggest that there is no differecing required as the data is stationary. There are very high fluctuations in the dataset as inventory is not a macroeconomic data. It is based on so many other factors, hence I conducted another forecast with keeping econometric point of view in mind and adding a differencing in the Seasonal part of the model. If we would have considered more variables in the dataset apart from production, sales, imports and exports, we might not need the differencing. 
+
+
+```{r}
+invts  %>% diff(12) %>% ggtsdisplay(lag=36)
+```
+
+## ARIMA (p,d,q) Non seasonal part (P,D,Q) Seasonal part
+
++ Seasonal part- ACF lag at 12 means P=0 Q = 1 
++ Non seasonal part- exponential curve in PACF hence, ACF p = 0 q = 1
++ Non seasonal part- sine curve in ACF Hence, PACF lag at p = 1 q = 0
+
+```{r}
+invts %>%
+  Arima(order=c(0,0,1), seasonal=c(0,1,1))
+
+
+fit3 <- Arima(invts, order=c(0,0,1), seasonal=c(0,1,1))
+checkresiduals(fit3)
+```
+
+The ARIMA model does well in capturing all the dynamics in the data as the residuals seem to be white noise.
+
+## Forecasting next 12 months
+
+```{r}
+
+plot(as.ts(invts))
+lines(fitted(fit3), col="red")
+
+fit3 %>% forecast(h=12) %>% autoplot()
+
+```
+
+# Conclusion 
+
+```{r}
+accuracy(fitARIMA)
+accuracy(fit3)
+```
+
+This captures the fluctuations a little better than the last forecast ARIMA model. 
+The P value for the model with differencing is higher (0.8653) than the p value without differencing (0.7278) which also suggests that the second model might be better. More over the RMSE value for the model with differencing is less than that of without differencing. 
+
+
+
+
+

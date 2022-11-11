@@ -1,0 +1,273 @@
+---
+title: "Econometrics Case Study"
+subtitle: "Automotive Gasoline Inventory"
+author: "Ratul Wadhwa"
+institute: "EY Economics"
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    css: css/style.css
+    yolo: FALSE
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+library(dplyr)
+library(fpp3)
+library(tidyverse)
+library(forecast)
+library(tseries)
+
+# Load data and create time series object 
+mydatanew = read.csv("data.csv", header=TRUE)  # read csv file
+
+#Set trim variable 
+trim <- length(mydatanew [,5])
+
+#Define variables
+Dates <- mydatanew [1:trim, 1]
+sale <- mydatanew [1:trim, 2]
+imports <- mydatanew [1:trim, 3]
+production <- mydatanew [1:trim, 4]
+export <-mydatanew [1:trim, 5]
+
+inventory <- production+imports-sale-export
+newdata = cbind(mydatanew,inventory)
+
+trim1 <- length(newdata [,6])
+inventoryn <-newdata[1:trim, 6]
+```
+
+.content-box-blue[ 
+.white[**Objective**🥅] 
+]
+
+The objective of this case study is to produce forecasts of the total automotive gasoline inventory
+on a month-to-month basis, using a combination of econometrics and arithmetic functions in R.
+
+---
+
+.content-box-blue[ 
+.white[**Total Automotive Gasoline Inventory**⛽️] 
+]
+
+.content-box-soft[ 
+.white[**Inventory = Inflow-Outflow**] 
+]
+
++ Production and imports are considered as the inputs here and sales and exports are the outputs. 
+
+--
+
+.content-box-soft[ 
+.white[**production+imports-sale-export**] 
+]
+
+--
+
++ The equation above gives us the total inventory of the automotive gasoline. 
++ The negative values here indicates shortage, outflow more than inflow.
+
+.footnote[
+[1] [Inventory](https://www.researchgate.net/publication/342700872_A_SYSTEM_DYNAMICS_MODEL_TO_DETERMINE_THE_VALUE_OF_INVENTORY_HOLDING_COST)
+
+]
+
+---
+
+.content-box-blue[ 
+.white[**Time Series Plot**📈] 
+]
+
+
+```{r, echo=FALSE, out.width= "70%",fig.align="center"}
+invts <- ts(inventoryn, start=c(2010, 7), end=c(2021, 9), frequency=12)
+plot(invts)
+#knitr::include_graphics("images/Rplot.png")
+```
+
+---
+
+.content-box-blue[ 
+.white[**Ljung-Box Test**] 
+]
+
+```{r}
+test <- Box.test(invts,type = c("Ljung-Box"))
+test
+
+```
+
+--
+
++ The test statistic is tiny, and well within the range we would expect for stationary data. So we can conclude that the data is stationary.
+---
+
+.content-box-blue[ 
+.white[**Unit Root Tests**] 
+]
+
+
+```{r}
+ndiffs(invts)
+nsdiffs(invts)
+```
+
+--
+
++ To double check that I used nsdiffs() and ndiffs() functions and as they returns 0, it suggest we do not need seasonal difference and a first difference.
+
+---
+
+.content-box-blue[ 
+.white[**Differencing The Data**] 
+]
+
++ Although the tests suggest that there is no differecing required as the data is stationary. 
++ There are very high fluctuations in the inventory dataset.
++ It is based on so many other factors.
+--
+
++ Hence, I created another forecast model with keeping econometric point of view in mind and adding a differencing in the Seasonal part of the model. 
+
+
+---
+
+.content-box-blue[ 
+.white[**AR I MA**] 
+]
+
+(p,d,q) Non seasonal part 
+(P,D,Q) Seasonal part
+
++ Based on the ACF and PACF plots the following two models were selected to forecast the Total Automotive Gasoline Inventory on a month on month basis. 
+
++ ARIMA (0,0,1)(1,0,1)[12] 
++ ARIMA (0,0,1)(0,1,1)[12]
+
+--
+
+Both the ARIMA model does well in capturing all the dynamics in the data as the residuals seem to be white noise.
+
+---
+.content-box-blue[ 
+.white[**Residual Check**] 
+]
+
+.panelset[
+
+.panel[.panel-name[Without Differencing]
+
+
+```{r , echo = FALSE, fig.align="center", fig.height=6}
+
+fitARIMA <- Arima(invts, order=c(0,0,1), seasonal=c(1,0,1))
+checkresiduals(fitARIMA)
+
+```
+
+]
+
+.panel[.panel-name[With Differencing]
+
+```{r, echo = FALSE, fig.align="center", fig.height=6}
+fit3 <- Arima(invts, order=c(0,0,1), seasonal=c(0,1,1))
+checkresiduals(fit3)
+```
+]
+]
+
+---
+
+```{r include=FALSE}
+library(xaringanExtra)
+ xaringanExtra::use_panelset()
+ xaringanExtra::style_panelset_tabs(foreground = "black", background = "lite gray")
+```
+
+.content-box-blue[ 
+.white[**ARIMA Model**] 
+]
+
+.panelset.sideways[
+
+.panel[.panel-name[Without Differencing]
+
+```{r include=FALSE}
+fitARIMA <- auto.arima(invts, trace=TRUE)
+```
+
+```{r , echo = FALSE, fig.align="center", out.width= "100%", out.height="80%"}
+plot(as.ts(invts))
+lines(fitted(fitARIMA), col="red")
+```
+
+]
+
+.panel[.panel-name[With Differencing]
+
+```{r include=FALSE}
+fit3 <- Arima(invts, order=c(0,0,1), seasonal=c(0,1,1))
+checkresiduals(fit3)
+```
+
+```{r , echo = FALSE, fig.align="center"}
+plot(as.ts(invts))
+lines(fitted(fit3), col="red")
+
+```
+
+]
+]
+---
+
+.content-box-blue[ 
+.white[**Forecasting Next 12 Months**] 
+]
+
+.panelset.sideways[
+
+.panel[.panel-name[Without Differencing]
+
+```{r , echo = FALSE, fig.align="center"}
+futurVal <- forecast(fitARIMA, h=12, level=c(95)) #confidence level 95%
+
+plot(forecast(futurVal))
+```
+
+]
+.panel[.panel-name[With Differencing]
+
+```{r, echo = FALSE, fig.align="center"}
+fit3 %>% forecast(h=12) %>% autoplot()
+```
+
+]]
+---
+
+.content-box-blue[ 
+.white[**Predicted Values**] 
+]
+
+```{r , echo = FALSE}
+futurVal$mean
+```
+
+
+---
+
+.content-box-blue[ 
+.white[**Conclusion**] 
+]
+
++ The second model (with differencing) captures the fluctuations a little better than the first forecast ARIMA model. 
++ The p value for the model with differencing is higher (0.8653) than the p value without differencing (0.7278) which also suggests that the second model might be performing slightly better.
+
+---
+class: center, middle
+
+# Thank You!
+
+![](https://media2.giphy.com/media/ZrlYxeVZ0zqkU/giphy.gif)
+
+
