@@ -5,6 +5,7 @@ on a month-to-month basis, using a combination of econometrics and arithmetic fu
 
 # Structure
 
+```
 ├── data.csv                            # Data for the project 
 ├── Casestudy.Rmd                       # Casestudy Rmd document 
 ├── Casestudy.pdf                       # Casestudy pdf document
@@ -12,3 +13,4 @@ on a month-to-month basis, using a combination of econometrics and arithmetic fu
 ├── presentation.html                   # Xaringan Presentation html
 ├── CSS                                 # Images and Css Styling for Xaringan
       
+```
