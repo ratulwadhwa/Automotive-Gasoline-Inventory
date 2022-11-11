@@ -67,6 +67,8 @@ inventoryn <-newdata[1:trim, 6]
 
 ```
 
+# Inventory 
+
  The total automotive gasoline inventory can be calculated by inflow-outflow. Production and imports are considered as the inputs here and sales and exports are the outputs. **production+imports-sale-expor** gives us the total inventory of the automotive gasoline. The negative values here indicates shortage, outflow more than inflow.
 
 # Time Series Plot 
